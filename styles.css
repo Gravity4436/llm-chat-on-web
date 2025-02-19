@@ -347,7 +347,7 @@
   overflow-x: auto;
   margin: 0.5em 0;
   font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
-  color: #d4d4d4;  /* 更亮的文本颜色 */
+  color: #ff9b05;  /* 更亮的文本颜色 */
   border: 1px solid #333;  /* 添加边框 */
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);  /* 添加阴影 */
 }
@@ -355,7 +355,7 @@
 /* 行内代码样式 */
 .message.assistant .message-content code {
   background: #2d2d2d;  /* 更深的背景色 */
-  color: #e0e0e0;      /* 更亮的文本颜色 */
+  color: #ff9b05;      /* 更亮的文本颜色 */
   padding: 0.2em 0.4em;
   border-radius: 3px;
   font-size: 0.9em;
@@ -374,7 +374,7 @@
   content: attr(data-language);
   display: block;
   background: #333;
-  color: #fff;
+  color: #f57906;
   padding: 0.2em 0.6em;
   border-radius: 3px;
   font-size: 0.8em;
@@ -923,8 +923,9 @@
 
 /* 思考过程内容样式 */
 .message.reasoning .message-content {
-  white-space: pre-wrap;
-  line-height: 1.5;
+  font-size: 1.3rem;  /* 增加字体大小 */
+  line-height: 1.7;   /* 相应调整行高 */
+  color: #2c3e50;     /* 使用深色以保持良好的可读性 */
 }
 
 /* 移动端适配 */
