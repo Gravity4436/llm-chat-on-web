@@ -10,7 +10,7 @@
    - 火山方舟引擎 豆包大家族、DeepSeek等
 - **实时流式响应**
   - 体验类ChatGPT的逐字输出效果
-  - 支持输入DeepSeek R1的思维链输出
+  - 支持DeepSeek R1的思维链输出
 - **安全存储** - 使用Web Crypto API加密存储API密钥
 - **现代UI** 
   - 可拖拽调整位置
