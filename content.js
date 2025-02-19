@@ -269,7 +269,7 @@ let currentProvider = 'deepseek'; // 默认值
     const messageWrapper = document.createElement('div');
     messageWrapper.className = 'message-wrapper';
     
-    // 添加提供商标签
+    // 添加提供商标签，只在 assistant 类型时显示
     if (role === 'assistant') {
         const providerTag = document.createElement('div');
         providerTag.className = 'provider-tag';
@@ -284,12 +284,12 @@ let currentProvider = 'deepseek'; // 默认值
     const contentDiv = document.createElement('div');
     contentDiv.className = 'message-content';
     
-    if (role === 'assistant') {
+    // 对 assistant 和 reasoning 类型使用 Markdown 解析
+    if (role === 'assistant' || role === 'reasoning') {
         try {
             if (typeof marked === 'undefined') {
                 throw new Error('Marked not available');
             }
-            // 解析 Markdown 并存储原始内容
             contentDiv.innerHTML = marked.parse(content);
             contentDiv.setAttribute('data-content', content);
         } catch (error) {
@@ -471,9 +471,11 @@ let currentProvider = 'deepseek'; // 默认值
       let response;
       console.log('Sending request to:', provider, 'with model:', model);
 
+      let messageDiv;
+      let reasoningDiv;  // 提升到函数作用域
+      
       if (provider === 'volcengine') {
         try {
-          let messageDiv;
           let retryCount = 0;
           const maxRetries = 3;
           
@@ -510,20 +512,36 @@ let currentProvider = 'deepseek'; // 默认值
                   for (const line of lines) {
                     if (line.trim() === '' || line.includes('[DONE]')) continue;
                     
-                    if (line.startsWith('data: ')) {
-                      try {
+                    try {
+                      if (line.startsWith('data: ')) {
                         const data = JSON.parse(line.slice(6));
-                        if (data.choices && data.choices[0].delta?.content) {
-                          const content = data.choices[0].delta.content;
-                          if (!messageDiv) {
-                            messageDiv = addMessage('assistant', '', provider);
+                        console.log('Response data:', data);
+                        if (data.choices && data.choices[0].delta) {
+                          const delta = data.choices[0].delta;
+                          console.log('Delta object:', delta);
+                          
+                          // 处理思考过程
+                          if (delta.reasoning_content && delta.reasoning_content.trim() !== '') {
+                            if (!reasoningDiv) {
+                              reasoningDiv = addMessage('reasoning', '', provider);
+                            }
+                            appendToMessage(reasoningDiv, delta.reasoning_content);
                           }
-                          appendToMessage(messageDiv, content);
-                          fullResponse += content;  // 累积响应内容
+                          
+                          // 处理回复内容
+                          if (delta.content && delta.content.trim() !== '') {
+                            if (!messageDiv) {
+                              const thinking = document.querySelector('.message.thinking');
+                              if (thinking) thinking.remove();
+                              messageDiv = addMessage('assistant', '', provider);
+                            }
+                            appendToMessage(messageDiv, delta.content);
+                            fullResponse += delta.content;
+                          }
                         }
-                      } catch (e) {
-                        console.error('Error parsing SSE message:', e, 'Line:', line);
                       }
+                    } catch (e) {
+                      console.error('Error parsing SSE message:', e, 'Line:', line);
                     }
                   }
                 }
@@ -652,12 +670,11 @@ let currentProvider = 'deepseek'; // 默认值
         throw new Error(errorData.error?.message || `API request failed: ${response?.status}`);
       }
 
-      let messageDiv;
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      
       let fullResponse = '';
       let buffer = '';
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
 
       while (true) {
         const { done, value } = await reader.read();
@@ -676,16 +693,28 @@ let currentProvider = 'deepseek'; // 默认值
           try {
             if (line.startsWith('data: ')) {
               const data = JSON.parse(line.slice(6));
-              if (data.choices && data.choices[0].delta?.content) {
-                const content = data.choices[0].delta.content;
-                if (content && content.trim() !== '') {
+              console.log('Response data:', data);
+              if (data.choices && data.choices[0].delta) {
+                const delta = data.choices[0].delta;
+                console.log('Delta object:', delta);
+                
+                // 处理思考过程
+                if (delta.reasoning_content && delta.reasoning_content.trim() !== '') {
+                  if (!reasoningDiv) {
+                    reasoningDiv = addMessage('reasoning', '', provider);
+                  }
+                  appendToMessage(reasoningDiv, delta.reasoning_content);
+                }
+                
+                // 处理回复内容
+                if (delta.content && delta.content.trim() !== '') {
                   if (!messageDiv) {
                     const thinking = document.querySelector('.message.thinking');
                     if (thinking) thinking.remove();
-                    messageDiv = addMessage('assistant', '');
+                    messageDiv = addMessage('assistant', '', provider);
                   }
-                  appendToMessage(messageDiv, content);
-                  fullResponse += content;
+                  appendToMessage(messageDiv, delta.content);
+                  fullResponse += delta.content;
                 }
               }
             }
