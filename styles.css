@@ -899,4 +899,38 @@
 .message-content pre {
   position: relative;
   padding-top: 20px;
+}
+
+/* 思考过程消息样式 */
+.message.reasoning {
+  background-color: #f8f9fa;
+  border-left: 3px solid #6c757d;
+  margin-bottom: 8px;
+  padding: 8px 12px;
+  font-size: 0.95em;
+  color: #666;
+}
+
+/* 思考过程标识 */
+.message.reasoning::before {
+  content: "思考过程";
+  display: block;
+  font-size: 0.8em;
+  color: #6c757d;
+  margin-bottom: 4px;
+  font-weight: 500;
+}
+
+/* 思考过程内容样式 */
+.message.reasoning .message-content {
+  white-space: pre-wrap;
+  line-height: 1.5;
+}
+
+/* 移动端适配 */
+@media screen and (max-width: 768px) {
+  .message.reasoning {
+    padding: 6px 10px;
+    font-size: 0.9em;
+  }
 } 
