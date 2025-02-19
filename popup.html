@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>AI Chat Assistant</title>
+  <style>
+    body {
+      width: 300px;
+      padding: 10px;
+    }
+    .form-group {
+      margin-bottom: 10px;
+    }
+    label {
+      display: block;
+      margin-bottom: 5px;
+    }
+    input, select, textarea {
+      width: 100%;
+      padding: 5px;
+    }
+    button {
+      width: 100%;
+      padding: 8px;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #45a049;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="form-group">
+      <label for="apiKey">API Key:</label>
+      <input type="password" id="apiKey" placeholder="Enter your API key">
+    </div>
+    <div class="form-group">
+      <label for="provider">Provider:</label>
+      <select id="provider">
+        <option value="moonshot">Moonshot AI</option>
+        <option value="qwen">Alibaba Qwen</option>
+        <option value="deepseek">DeepSeek</option>
+        <option value="volcengine">火山方舟</option>
+      </select>
+    </div>
+    <div class="form-group model-input" style="display: none;">
+      <label for="modelInput">Model ID:</label>
+      <input type="text" id="modelInput" placeholder="请输入火山方舟Model ID">
+    </div>
+    <div class="form-group">
+      <label for="model">Model:</label>
+      <select id="model">
+        <!-- Moonshot Models -->
+        <option value="moonshot-v1-8k" data-provider="moonshot">Moonshot v1 8k</option>
+        <option value="moonshot-v1-32k" data-provider="moonshot">Moonshot v1 32k</option>
+        <!-- Qwen Models -->
+        <option value="qwen-max" data-provider="qwen">Qwen Max</option>
+        <option value="qwen-max-latest" data-provider="qwen">Qwen Max Latest</option>
+        <option value="deepseek-r1" data-provider="qwen">Deep Seek R1 阿里云百炼</option>
+        <option value="deepseek-v3" data-provider="qwen">Deep Seek V3 阿里云百炼</option>
+        <!-- DeepSeek Models -->
+        <option value="deepseek-chat" data-provider="deepseek">DeepSeek Chat</option>
+        <option value="deepseek-reasoner" data-provider="deepseek">DeepSeek Reasoner</option>
+      </select>
+    </div>
+    <button id="startChat">Start Chat</button>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html> 

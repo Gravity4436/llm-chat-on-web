@@ -1,0 +1,53 @@
+{
+  "manifest_version": 3,
+  "name": "AI Chat Assistant",
+  "version": "1.0",
+  "description": "A Chrome extension for interacting with AI APIs",
+  "permissions": [
+    "activeTab",
+    "storage",
+    "scripting",
+    "tabs"
+  ],
+  "optional_permissions": [],
+  "host_permissions": [
+    "https://api.moonshot.cn/*",
+    "https://dashscope.aliyuncs.com/*",
+    "https://api.deepseek.com/*",
+    "https://ark.cn-beijing.volces.com/*"
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'; connect-src 'self' https://api.moonshot.cn https://dashscope.aliyuncs.com https://ark.cn-beijing.volces.com;",
+    "sandbox": "sandbox allow-scripts allow-forms allow-popups allow-modals"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": "ai.png"
+  },
+  "icons": {
+    "16": "icon16.png",
+    "32": "icon32.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  },
+
+  "background": {
+    "service_worker": "background.js"
+  },
+  "web_accessible_resources": [{
+    "resources": ["lib/marked.min.js"],
+    "matches": ["<all_urls>"]
+  }],
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": [
+        "lib/marked.min.js",
+        "content.js"
+      ],
+      "css": ["styles.css"],
+      "run_at": "document_end"
+    }
+  ],
+  "minimum_chrome_version": "92"
+} 
