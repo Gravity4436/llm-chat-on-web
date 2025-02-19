@@ -4,11 +4,13 @@
 
 - **多模型支持** 
   - 目前支持
-    moonshot 8k、moonshot 32k
-    阿里云 qwen-max-latest、qwen-max、百炼deepseek r1、百炼deepseek v3
-    DeepSeek源生 deepseek r1、deepseek v3
-    火山方舟引擎 豆包大家族、DeepSeek等
-- **实时流式响应** - 体验类ChatGPT的逐字输出效果
+   - moonshot 8k、moonshot 32k
+   - 阿里云 qwen-max-latest、qwen-max、百炼DeepSeek r1、百炼DeepSeek v3
+   - DeepSeek源生 DeepSeek r1、DeepSeek v3
+   - 火山方舟引擎 豆包大家族、DeepSeek等
+- **实时流式响应**
+  - 体验类ChatGPT的逐字输出效果
+  - 支持输入DeepSeek R1的思维链输出
 - **安全存储** - 使用Web Crypto API加密存储API密钥
 - **现代UI** 
   - 可拖拽调整位置
