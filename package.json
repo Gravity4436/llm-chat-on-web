@@ -1,4 +1,5 @@
 {
+  "name": "llm-chat-on-web",
   "devDependencies": {
     "wxt": "^0.19.27"
   }
