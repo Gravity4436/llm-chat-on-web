@@ -35,6 +35,23 @@ var chatContainer = window.chatContainer || null;
 // 在内容脚本顶部添加当前提供商变量
 let currentProvider = 'deepseek'; // 默认值
 
+// 全局变量
+let currentTabId; // 当前标签页ID
+let fullResponse = ''; // 用于累积助手的完整响应
+
+// 在扩展初始化时获取当前标签页ID
+function initializeTabId() {
+  chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
+    if (tabs && tabs[0]) {
+      currentTabId = tabs[0].id;
+      console.log('当前标签页ID:', currentTabId);
+    }
+  });
+}
+
+// 在文档加载时调用初始化函数
+document.addEventListener('DOMContentLoaded', initializeTabId);
+
 // 或者使用更安全的方式，将所有代码包装在一个立即执行函数中
 (function() {
   // 检查是否已经初始化
@@ -64,6 +81,27 @@ let currentProvider = 'deepseek'; // 默认值
     }
     return true;
   });
+
+  // 添加定期自动保存功能
+  let autoSaveInterval;
+
+  function startAutoSave() {
+    if (autoSaveInterval) {
+      clearInterval(autoSaveInterval);
+    }
+    
+    autoSaveInterval = setInterval(() => {
+      console.log('定时自动保存聊天记录');
+      saveCurrentChat();
+    }, 30000); // 每30秒保存一次
+  }
+
+  function stopAutoSave() {
+    if (autoSaveInterval) {
+      clearInterval(autoSaveInterval);
+      autoSaveInterval = null;
+    }
+  }
 
   function createChatInterface() {
     return new Promise((resolve) => {
@@ -157,6 +195,8 @@ let currentProvider = 'deepseek'; // 默认值
       // 添加关闭按钮事件监听
       const closeButton = chatContainer.querySelector('.close-button');
       closeButton.addEventListener('click', () => {
+        console.log('关闭按钮被点击，保存聊天记录');
+        saveCurrentChat();
         removeChatInterface();
       });
 
@@ -203,6 +243,12 @@ let currentProvider = 'deepseek'; // 默认值
             }
           }
         });
+
+        // 添加延迟保存（给API响应一些时间）
+        setTimeout(() => {
+          console.log('用户消息发送后延迟保存');
+          saveCurrentChat();
+        }, 2000);
       });
 
       // 添加模型显示更新逻辑
@@ -215,6 +261,10 @@ let currentProvider = 'deepseek'; // 默认值
 
       // 添加调整大小功能
       initResize();
+
+      // 在创建完聊天界面后添加历史记录按钮
+      addHistoryButton();
+      startAutoSave(); // 启动自动保存
     });
   }
 
@@ -269,7 +319,7 @@ let currentProvider = 'deepseek'; // 默认值
     const messageWrapper = document.createElement('div');
     messageWrapper.className = 'message-wrapper';
     
-    // 添加提供商标签
+    // 添加提供商标签，只在 assistant 类型时显示
     if (role === 'assistant') {
         const providerTag = document.createElement('div');
         providerTag.className = 'provider-tag';
@@ -284,12 +334,12 @@ let currentProvider = 'deepseek'; // 默认值
     const contentDiv = document.createElement('div');
     contentDiv.className = 'message-content';
     
-    if (role === 'assistant') {
+    // 对 assistant 和 reasoning 类型使用 Markdown 解析
+    if (role === 'assistant' || role === 'reasoning') {
         try {
             if (typeof marked === 'undefined') {
                 throw new Error('Marked not available');
             }
-            // 解析 Markdown 并存储原始内容
             contentDiv.innerHTML = marked.parse(content);
             contentDiv.setAttribute('data-content', content);
         } catch (error) {
@@ -351,6 +401,7 @@ let currentProvider = 'deepseek'; // 默认值
           });
         }
       }, 300);
+      stopAutoSave(); // 停止自动保存
     }
   }
 
@@ -425,13 +476,13 @@ let currentProvider = 'deepseek'; // 默认值
   function getSystemPrompt(provider) {
     switch (provider) {
       case 'moonshot':
-        return "你是 Kimi，由 Moonshot AI 提供的人工智能助手";
+        return "你是 Kimi，由 Moonshot AI 提供的人工智能助手，在回应用户时，请确保使用 Github Flavored Markdown 正确地设置你的回复样式。使用 markdown 语法来处理标题、列表、彩色文本、代码块、高亮等内容。确保在实际回复中不要提及 markdown 或样式。";
       case 'qwen':
-        return "你是通义千问，由阿里云提供的人工智能助手";
+        return "你是通义千问，由阿里云提供的人工智能助手，在回应用户时，请确保使用 Github Flavored Markdown 正确地设置你的回复样式。使用 markdown 语法来处理标题、列表、彩色文本、代码块、高亮等内容。确保在实际回复中不要提及 markdown 或样式。";
       case 'deepseek':
-        return "你是DeepSeek，由深度求索公司开发的人工智能助手";
+        return "你是DeepSeek，由深度求索公司开发的人工智能助手，在回应用户时，请确保使用 Github Flavored Markdown 正确地设置你的回复样式。使用 markdown 语法来处理标题、列表、彩色文本、代码块、高亮等内容。确保在实际回复中不要提及 markdown 或样式。";
       case 'volcengine':
-        return "你是豆包，是由字节跳动开发的 AI 人工智能助手";
+        return "你是豆包，是由字节跳动开发的 AI 人工智能助手，在回应用户时，请确保使用 Github Flavored Markdown 正确地设置你的回复样式。使用 markdown 语法来处理标题、列表、彩色文本、代码块、高亮等内容。确保在实际回复中不要提及 markdown 或样式。";
       default:
         return "你是一个有帮助的AI助手";
     }
@@ -471,9 +522,11 @@ let currentProvider = 'deepseek'; // 默认值
       let response;
       console.log('Sending request to:', provider, 'with model:', model);
 
+      let messageDiv;
+      let reasoningDiv;  // 提升到函数作用域
+      
       if (provider === 'volcengine') {
         try {
-          let messageDiv;
           let retryCount = 0;
           const maxRetries = 3;
           
@@ -510,20 +563,36 @@ let currentProvider = 'deepseek'; // 默认值
                   for (const line of lines) {
                     if (line.trim() === '' || line.includes('[DONE]')) continue;
                     
-                    if (line.startsWith('data: ')) {
-                      try {
+                    try {
+                      if (line.startsWith('data: ')) {
                         const data = JSON.parse(line.slice(6));
-                        if (data.choices && data.choices[0].delta?.content) {
-                          const content = data.choices[0].delta.content;
-                          if (!messageDiv) {
-                            messageDiv = addMessage('assistant', '', provider);
+                        console.log('Response data:', data);
+                        if (data.choices && data.choices[0].delta) {
+                          const delta = data.choices[0].delta;
+                          console.log('Delta object:', delta);
+                          
+                          // 处理思考过程
+                          if (delta.reasoning_content && delta.reasoning_content.trim() !== '') {
+                            if (!reasoningDiv) {
+                              reasoningDiv = addMessage('reasoning', '', provider);
+                            }
+                            appendToMessage(reasoningDiv, delta.reasoning_content);
                           }
-                          appendToMessage(messageDiv, content);
-                          fullResponse += content;  // 累积响应内容
+                          
+                          // 处理回复内容
+                          if (delta.content && delta.content.trim() !== '') {
+                            if (!messageDiv) {
+                              const thinking = document.querySelector('.message.thinking');
+                              if (thinking) thinking.remove();
+                              messageDiv = addMessage('assistant', '', provider);
+                            }
+                            appendToMessage(messageDiv, delta.content);
+                            fullResponse += delta.content;
+                          }
                         }
-                      } catch (e) {
-                        console.error('Error parsing SSE message:', e, 'Line:', line);
                       }
+                    } catch (e) {
+                      console.error('Error parsing SSE message:', e, 'Line:', line);
                     }
                   }
                 }
@@ -652,12 +721,11 @@ let currentProvider = 'deepseek'; // 默认值
         throw new Error(errorData.error?.message || `API request failed: ${response?.status}`);
       }
 
-      let messageDiv;
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      
       let fullResponse = '';
       let buffer = '';
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
 
       while (true) {
         const { done, value } = await reader.read();
@@ -676,16 +744,28 @@ let currentProvider = 'deepseek'; // 默认值
           try {
             if (line.startsWith('data: ')) {
               const data = JSON.parse(line.slice(6));
-              if (data.choices && data.choices[0].delta?.content) {
-                const content = data.choices[0].delta.content;
-                if (content && content.trim() !== '') {
+              console.log('Response data:', data);
+              if (data.choices && data.choices[0].delta) {
+                const delta = data.choices[0].delta;
+                console.log('Delta object:', delta);
+                
+                // 处理思考过程
+                if (delta.reasoning_content && delta.reasoning_content.trim() !== '') {
+                  if (!reasoningDiv) {
+                    reasoningDiv = addMessage('reasoning', '', provider);
+                  }
+                  appendToMessage(reasoningDiv, delta.reasoning_content);
+                }
+                
+                // 处理回复内容
+                if (delta.content && delta.content.trim() !== '') {
                   if (!messageDiv) {
                     const thinking = document.querySelector('.message.thinking');
                     if (thinking) thinking.remove();
-                    messageDiv = addMessage('assistant', '');
+                    messageDiv = addMessage('assistant', '', provider);
                   }
-                  appendToMessage(messageDiv, content);
-                  fullResponse += content;
+                  appendToMessage(messageDiv, delta.content);
+                  fullResponse += delta.content;
                 }
               }
             }
@@ -708,6 +788,12 @@ let currentProvider = 'deepseek'; // 默认值
 
       console.log('Response status:', response.status);
       console.log('Response headers:', [...response.headers.entries()]);
+
+      // 检查是否是最后一个响应块
+      if (response.choices && response.choices[0] && response.choices[0].finish_reason === 'stop') {
+        console.log('流式响应结束，保存聊天记录');
+        saveCurrentChat();
+      }
     } catch (error) {
       console.error('Full error details:', error);
       console.error('API request failed:', error);
@@ -793,5 +879,260 @@ let currentProvider = 'deepseek'; // 默认值
       'volcengine': '火山方舟引擎'
     };
     return providerMap[providerKey] || 'AI Assistant';
+  }
+
+  /**
+   * 保存当前聊天记录到本地存储
+   */
+  function saveCurrentChat() {
+    if (!chatContainer) {
+      console.error('找不到聊天容器，无法保存');
+      return;
+    }
+    
+    // 获取当前提供商信息
+    let provider = currentProvider;
+    if (!provider) {
+      // 如果全局变量不可用，尝试从DOM元素获取
+      const assistantMsg = chatContainer.querySelector('.message.assistant');
+      if (assistantMsg) {
+        provider = assistantMsg.getAttribute('data-provider');
+      }
+      
+      if (!provider) {
+        console.error('无法确定当前提供商，使用默认值');
+        provider = 'deepseek'; // 使用默认值
+      }
+    }
+    
+    console.log('准备保存聊天记录，提供商:', provider);
+    
+    const chatMessages = chatContainer.querySelector('.chat-messages');
+    if (!chatMessages) {
+      console.error('找不到聊天消息容器');
+      return;
+    }
+    
+    const messages = chatMessages.querySelectorAll('.message');
+    if (messages.length === 0) {
+      console.warn('没有聊天消息可保存');
+      return;
+    }
+    
+    const chatData = [];
+    
+    messages.forEach(msg => {
+      // 用户消息
+      if (msg.classList.contains('user')) {
+        const content = msg.querySelector('.message-content')?.textContent || '';
+        chatData.push({
+          role: 'user',
+          content: content
+        });
+      } 
+      // 助手消息
+      else if (msg.classList.contains('assistant')) {
+        const content = msg.querySelector('.message-content')?.textContent || '';
+        const providerTag = msg.querySelector('.provider-tag')?.textContent || '';
+        const msgProvider = msg.getAttribute('data-provider') || provider;
+        
+        chatData.push({
+          role: 'assistant',
+          content: content,
+          provider: msgProvider,
+          providerTag: providerTag
+        });
+      }
+      // reasoning消息
+      else if (msg.classList.contains('reasoning')) {
+        const content = msg.querySelector('.message-content')?.textContent || '';
+        chatData.push({
+          role: 'reasoning',
+          content: content
+        });
+      }
+    });
+    
+    console.log('收集到的聊天数据:', chatData.length, '条消息');
+    
+    // 检查数据大小
+    if (JSON.stringify(chatData).length > 4000000) { // ~4MB
+      console.warn('聊天记录过大，仅保存最近部分');
+      chatData.splice(0, Math.floor(chatData.length / 2));
+    }
+    
+    // 使用当前提供商作为存储键
+    const storageKey = `chat_history_${provider}`;
+    chrome.storage.local.set({[storageKey]: chatData}, () => {
+      if (chrome.runtime.lastError) {
+        console.error('保存聊天记录失败:', chrome.runtime.lastError);
+      } else {
+        console.log('聊天记录已成功保存，提供商:', provider, '消息数量:', chatData.length);
+      }
+    });
+  }
+
+  /**
+   * 添加历史记录按钮到聊天界面
+   */
+  function addHistoryButton() {
+    if (!chatContainer) {
+      console.error('找不到聊天容器');
+      return;
+    }
+    
+    // 如果按钮已存在，不重复添加
+    if (chatContainer.querySelector('.history-container')) {
+      return;
+    }
+    
+    const chatHeader = chatContainer.querySelector('.chat-header');
+    if (!chatHeader) {
+      console.error('找不到聊天头部元素');
+      return;
+    }
+    
+    // 创建历史记录按钮容器
+    const historyContainer = document.createElement('div');
+    historyContainer.className = 'history-container';
+    historyContainer.style.cssText = 'display: flex; background-color: #f0f0f0; padding: 8px; align-items: center; border-bottom: 1px solid #ddd;';
+    
+    // 创建历史记录按钮
+    const historyButton = document.createElement('div');
+    historyButton.className = 'ai-chat-history';
+    historyButton.textContent = '历史记录';
+    historyButton.style.cssText = 'flex-grow: 1; text-align: center; cursor: pointer; color: #555; font-weight: bold;';
+    historyButton.title = '查看历史聊天记录';
+    
+    // 创建清除按钮
+    const clearButton = document.createElement('div');
+    clearButton.className = 'clear-history';
+    clearButton.innerHTML = '&#128465;'; // 垃圾桶图标
+    clearButton.style.cssText = 'cursor: pointer; padding: 0 10px; color: #888; font-size: 16px;';
+    clearButton.title = '清除历史记录';
+    
+    // 添加事件监听
+    historyButton.addEventListener('click', loadChatHistory);
+    clearButton.addEventListener('click', confirmClearHistory);
+    
+    // 将按钮添加到容器
+    historyContainer.appendChild(historyButton);
+    historyContainer.appendChild(clearButton);
+    
+    // 在header下方插入按钮容器
+    chatHeader.parentNode.insertBefore(historyContainer, chatHeader.nextSibling);
+  }
+
+  /**
+   * 加载并显示历史聊天记录
+   */
+  function loadChatHistory() {
+    if (!chatContainer) {
+      console.error('找不到聊天容器');
+      return;
+    }
+    
+    // 获取当前提供商信息
+    let provider = currentProvider;
+    if (!provider) {
+      // 如果全局变量不可用，尝试从DOM元素获取
+      const assistantMsg = chatContainer.querySelector('.message.assistant');
+      if (assistantMsg) {
+        provider = assistantMsg.getAttribute('data-provider');
+      }
+      
+      if (!provider) {
+        console.warn('未找到提供商信息，使用默认值');
+        provider = 'deepseek'; // 使用默认值
+      }
+    }
+    
+    console.log('开始加载聊天记录，提供商:', provider);
+    
+    // 使用提供商作为存储键
+    const storageKey = `chat_history_${provider}`;
+    chrome.storage.local.get([storageKey], (result) => {
+      console.log('获取的存储数据:', result);
+      const chatData = result[storageKey];
+      
+      if (chatData && chatData.length > 0) {
+        const chatMessages = chatContainer.querySelector('.chat-messages');
+        if (!chatMessages) {
+          console.error('找不到聊天消息容器');
+          return;
+        }
+        
+        // 清空当前聊天内容
+        chatMessages.innerHTML = '';
+        
+        // 重建聊天记录
+        chatData.forEach(msg => {
+          if (msg.role === 'user') {
+            addMessage('user', msg.content, provider);
+          } else if (msg.role === 'assistant') {
+            // 创建消息元素
+            const messageDiv = addMessage('assistant', msg.content, msg.provider || provider);
+            
+            // 如果有提供商标签信息，尝试添加
+            if (msg.providerTag && messageDiv) {
+              const providerTag = messageDiv.querySelector('.provider-tag');
+              if (providerTag) {
+                providerTag.textContent = msg.providerTag;
+              }
+            }
+          } else if (msg.role === 'reasoning') {
+            // 添加 reasoning 消息
+            addMessage('reasoning', msg.content, provider);
+          }
+        });
+        
+        // 滚动到底部
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+      } else {
+        // 显示提示
+        alert('没有找到聊天记录');
+      }
+    });
+  }
+
+  /**
+   * 确认清除历史记录
+   */
+  function confirmClearHistory() {
+    if (confirm('确定要清除所有聊天历史记录吗？')) {
+      clearChatHistory();
+    }
+  }
+
+  /**
+   * 清除保存的聊天历史记录
+   */
+  function clearChatHistory() {
+    if (!chatContainer) {
+      console.error('找不到聊天容器');
+      return;
+    }
+    
+    // 获取当前提供商信息
+    let provider = currentProvider;
+    if (!provider) {
+      // 如果全局变量不可用，尝试从DOM元素获取
+      const assistantMsg = chatContainer.querySelector('.message.assistant');
+      if (assistantMsg) {
+        provider = assistantMsg.getAttribute('data-provider');
+      }
+      
+      if (!provider) {
+        console.warn('未找到提供商信息，使用默认值');
+        provider = 'deepseek'; // 使用默认值
+      }
+    }
+    
+    // 使用提供商作为存储键
+    const storageKey = `chat_history_${provider}`;
+    chrome.storage.local.remove(storageKey, () => {
+      console.log('聊天记录已清除');
+      alert('历史记录已清除');
+    });
   }
 })();
